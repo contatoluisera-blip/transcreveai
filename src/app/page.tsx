@@ -1,64 +1,168 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useRef } from 'react';
+import styles from './page.module.css';
 
 export default function Home() {
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFile(e.target.files[0]);
+      setResult(null);
+      setError(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setFile(e.dataTransfer.files[0]);
+      setResult(null);
+      setError(null);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+
+    setLoading(true);
+    setError(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/process-audio', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao processar o áudio.');
+      }
+
+      setResult(data.result);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopy = () => {
+    if (resultRef.current) {
+      const textToCopy = resultRef.current.innerText;
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
+  };
+
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className={styles.container}>
+      <main className={styles.main}>
+        <div className={styles.header}>
+          <div className={styles.badge}>BETA</div>
+          <h1 className={styles.title}>TranscreveAi</h1>
+          <p className={styles.subtitle}>Transcrição Literal e Decupagem com Timecodes de Áudios</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {!result && (
+          <div className={styles.uploadSection}>
+            <div 
+              className={`${styles.dropZone} ${file ? styles.hasFile : ''}`}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {file ? (
+                <div className={styles.fileSelected}>
+                  <div className={styles.iconFile}>🎙️</div>
+                  <p className={styles.fileName}>{file.name}</p>
+                  <p className={styles.fileSize}>{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                </div>
+              ) : (
+                <div className={styles.emptyState}>
+                  <div className={styles.iconUpload}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/>
+                      <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                  </div>
+                  <p>Arraste e solte seu arquivo de áudio</p>
+                  <span>ou clique para procurar (MP3, M4A, WAV)</span>
+                </div>
+              )}
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                accept="audio/mp3, audio/m4a, audio/wav, audio/mpeg, audio/mp4" 
+                hidden 
+              />
+            </div>
+
+            <button 
+              className={`${styles.button} ${loading ? styles.loading : ''}`} 
+              onClick={handleUpload}
+              disabled={!file || loading}
+            >
+              {loading ? (
+                <span className={styles.buttonContent}>
+                  <span className={styles.spinner}></span>
+                  Analisando Áudio...
+                </span>
+              ) : (
+                'Gerar Transcrição Literal'
+              )}
+            </button>
+            {error && <p className={styles.errorMessage}>{error}</p>}
+          </div>
+        )}
+
+        {result && (
+          <div className={styles.resultSection}>
+            <div className={styles.resultHeader}>
+              <h2>Transcrição Literal</h2>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  className={styles.resetButton}
+                  style={{ backgroundColor: copied ? '#10b981' : '', color: copied ? '#fff' : '' }}
+                  onClick={handleCopy}
+                >
+                  {copied ? 'Copiado!' : 'Copiar Texto'}
+                </button>
+                <button 
+                  className={styles.resetButton}
+                  onClick={() => { setResult(null); setFile(null); setCopied(false); }}
+                >
+                  Processar Novo Áudio
+                </button>
+              </div>
+            </div>
+            <div 
+              ref={resultRef}
+              className={styles.resultContent}
+              dangerouslySetInnerHTML={{ __html: result }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          </div>
+        )}
       </main>
     </div>
   );

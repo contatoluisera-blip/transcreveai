@@ -113,7 +113,7 @@ export default function Home() {
                 type="file" 
                 ref={fileInputRef} 
                 onChange={handleFileChange} 
-                accept="audio/mp3, audio/m4a, audio/wav, audio/mpeg, audio/mp4" 
+                accept=".mp3, .m4a, .wav, .mp4, audio/*" 
                 hidden 
               />
             </div>

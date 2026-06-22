@@ -14,9 +14,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Nenhum arquivo enviado.' }, { status: 400 });
     }
 
-    // O Next.js Request nos dá um File compatível com o OpenAI SDK
+    // O Next.js Request nos dá um File, mas as vezes ele perde o nome/extensão
+    // Vamos garantir que o arquivo tenha um nome válido para a API da OpenAI aceitar (especialmente m4a do iPhone)
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    // Pegamos a extensão original ou usamos .m4a como fallback se vier vazio
+    const originalName = file.name || 'audio.m4a';
+    const extension = originalName.includes('.') ? '' : '.m4a';
+    const safeFileName = `${originalName}${extension}`;
+
+    const safeFile = new File([buffer], safeFileName, { type: file.type || 'audio/mp4' });
+
     const transcription = await openai.audio.transcriptions.create({
-      file: file,
+      file: safeFile,
       model: 'whisper-1',
       response_format: 'verbose_json',
     });
